@@ -20,11 +20,7 @@ import "./modules/FantomMintCore.sol";
 // Minting is burdened with a minting fee defined as the amount
 // of percent of the minted tokens value in fUSD. Burning is free
 // of any fee.
-contract FantomMint is Ownable, ReentrancyGuard, FantomMintCore {
-    // define used libs
-    using SafeMath for uint256;
-    using Address for address;
-    using SafeERC20 for ERC20;
+contract FantomMint is FantomMintCore {
 
     // feePool keeps information about the fee collected from
     // minter internal operations in fMin fee tokens identified below (fUSD).
@@ -141,7 +137,7 @@ contract FantomMint is Ownable, ReentrancyGuard, FantomMintCore {
         }
 
         // add the minted amount to the debt
-        debtAdd(msg.sender, _token, _amount);
+        debtStorage.debtAdd(msg.sender, _token, _amount);
 
         // calculate the minting fee and store the value we gained by this operation
         // @NOTE: We don't check if the fee can be added to the account debt
@@ -155,7 +151,7 @@ contract FantomMint is Ownable, ReentrancyGuard, FantomMintCore {
         feePool = feePool.add(fee);
 
         // add the fee to debt
-        debtAdd(msg.sender, feeTokenAddress(), fee);
+        debtStorage.debtAdd(msg.sender, feeTokenAddress(), fee);
 
         // mint the requested balance of the ERC20 token
         // @NOTE: the fMint contract must have the minter privilege on the ERC20 token!
@@ -179,7 +175,7 @@ contract FantomMint is Ownable, ReentrancyGuard, FantomMintCore {
         }
 
         // make sure there is enough debt on the token specified (if any at all)
-        if (_amount > debtBalance[msg.sender][_token]) {
+        if (_amount > debtStorage.balance(msg.sender,_token)) {
             return ERR_LOW_BALANCE;
         }
 
@@ -193,7 +189,7 @@ contract FantomMint is Ownable, ReentrancyGuard, FantomMintCore {
         ERC20Burnable(_token).burnFrom(msg.sender, _amount);
 
         // clear the repaid amount from the account debt balance
-        debtSub(msg.sender, _token, _amount);
+        debtStorage.debtSub(msg.sender, _token, _amount);
 
         // emit the repay notification
         emit Repaid(_token, msg.sender, _amount);

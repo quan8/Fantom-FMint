@@ -19,15 +19,13 @@ contract FantomMintCore is
             Ownable,
             ReentrancyGuard,
             FantomMintErrorCodes,
-            FantomCollateralStorage,
-            FantomDebtStorage,
             FantomMintRewardManager
 {
     // define used libs
     using SafeMath for uint256;
     using Address for address;
     using SafeERC20 for ERC20;
-
+    
     // -------------------------------------------------------------
     // Price and value calculation related constants
     // -------------------------------------------------------------
@@ -42,6 +40,12 @@ contract FantomMintCore is
     // collateralRatioDecimalsCorrection represents the value to be used
     // to adjust result decimals after applying ratio to a value calculation.
     uint256 public constant collateralRatioDecimalsCorrection = 10000;
+    
+    // internal collateralStorage
+    FantomCollateralStorage collateralStorage;
+ 
+ 	// internal debtStorage
+    FantomDebtStorage debtStorage;
 
     // -------------------------------------------------------------
     // Emitted events definition
@@ -86,8 +90,8 @@ contract FantomMintCore is
         // calculate the collateral and debt values in ref. denomination
         // for the current exchange rate and balance amounts including
         // given adjustments to both values as requested.
-        uint256 cDebtValue = debtValueOf(_account).add(addDebt);
-        uint256 cCollateralValue = collateralValueOf(_account).sub(subCollateral);
+        uint256 cDebtValue = debtStorage.debtValueOf(_account).add(addDebt);
+        uint256 cCollateralValue = collateralStorage.collateralValueOf(_account).sub(subCollateral);
 
         // minCollateralValue is the minimal collateral value required for the current debt
         // to be within the minimal allowed collateral to debt ratio
@@ -133,13 +137,13 @@ contract FantomMintCore is
     // which yield a reward to entitled participants based
     // on their individual principal share.
     function principalBalance() public view returns (uint256) {
-        return debtTotal();
+        return debtStorage.debtTotal();
     }
 
     // principalBalanceOf returns the balance of principal token
     // which yield a reward share for this account.
     function principalBalanceOf(address _account) public view returns (uint256) {
-        return debtValueOf(_account);
+        return debtStorage.debtValueOf(_account);
     }
 
     // -------------------------------------------------------------
@@ -179,7 +183,7 @@ contract FantomMintCore is
         rewardUpdate(msg.sender);
 
         // add the collateral to the account
-        collateralAdd(msg.sender, _token, _amount);
+        collateralStorage.collateralAdd(msg.sender, _token, _amount);
 
         // emit the event signaling a successful deposit
         emit Deposited(_token, msg.sender, _amount);
@@ -199,7 +203,7 @@ contract FantomMintCore is
         }
 
         // make sure the withdraw does not exceed collateral balance
-        if (_amount > collateralBalance[msg.sender][_token]) {
+        if (_amount > collateralStorage.balance(msg.sender,_token)) {
             return ERR_LOW_BALANCE;
         }
 
@@ -213,7 +217,7 @@ contract FantomMintCore is
         rewardUpdate(msg.sender);
 
         // remove the collateral from account
-        collateralSub(msg.sender, _token, _amount);
+        collateralStorage.collateralSub(msg.sender, _token, _amount);
 
         // transfer withdrawn ERC20 tokens to the caller
         ERC20(_token).safeTransfer(msg.sender, _amount);
